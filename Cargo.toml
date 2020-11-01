@@ -1,7 +1,7 @@
 [package]
 authors = ["T.J. Telan <t.telan@gmail.com>"]
-categories = []
-description = ""
+categories = ["events", "loop", "callback", "handler", "signal"]
+description = "Customizable event handler for updates in remote git repositories"
 documentation = "https://docs.rs/git-event"
 edition = "2018"
 keywords = ["git"]
@@ -15,13 +15,11 @@ version = "0.0.1"
 status = "actively-developed"
 
 [dependencies]
-calloop = "^0.7"
 git2 = "^0.13"
 git-url-parse = "^0.3"
 git2_credentials = "^0.6"
 eyre = "^0.6"
 mktemp = "^0.4"
 
-
-#This is just for the binary
+[dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
