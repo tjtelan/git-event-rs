@@ -1,6 +1,6 @@
 [package]
 authors = ["T.J. Telan <t.telan@gmail.com>"]
-categories = ["events", "loop", "callback", "handler", "signal"]
+categories = ["asynchronous"]
 description = "Customizable event handler for updates in remote git repositories"
 documentation = "https://docs.rs/git-event"
 edition = "2018"
