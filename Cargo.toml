@@ -1,0 +1,27 @@
+[package]
+authors = ["T.J. Telan <t.telan@gmail.com>"]
+categories = []
+description = ""
+documentation = "https://docs.rs/git-event"
+edition = "2018"
+keywords = ["git"]
+license = "MIT"
+name = "git-event"
+readme = "README.md"
+repository = "https://github.com/tjtelan/git-event-rs"
+version = "0.0.1"
+
+[badges.maintenance]
+status = "actively-developed"
+
+[dependencies]
+calloop = "^0.7"
+git2 = "^0.13"
+git-url-parse = "^0.3"
+git2_credentials = "^0.6"
+eyre = "^0.6"
+mktemp = "^0.4"
+
+
+#This is just for the binary
+tokio = { version = "0.2", features = ["full"] }
