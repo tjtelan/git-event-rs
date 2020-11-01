@@ -1,4 +1,4 @@
-name: git-events 
+name: git-event 
 
 on: [push]
 
