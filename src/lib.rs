@@ -28,10 +28,10 @@ type BranchHeads = HashMap<String, GitCommitMeta>;
 
 #[derive(Clone, Debug)]
 pub struct GitRepoWatchHandler {
-    url: GitUrl,
-    credentials: Option<GitCredentials>,
-    branch_filter: Option<Vec<String>>,
-    use_shallow: bool,
+    pub url: GitUrl,
+    pub credentials: Option<GitCredentials>,
+    pub branch_filter: Option<Vec<String>>,
+    pub use_shallow: bool,
     //branch_heads: Option<BranchHeads>,
     // TODO:
     //path_filter: Option<Vec<String>>,
@@ -39,15 +39,15 @@ pub struct GitRepoWatchHandler {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GitRepoState {
-    url: GitUrl,
-    branch_heads: BranchHeads,
+    pub url: GitUrl,
+    pub branch_heads: BranchHeads,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GitCommitMeta {
-    id: Vec<u8>,
-    message: Option<String>,
-    epoch_time: i64,
+    pub id: Vec<u8>,
+    pub message: Option<String>,
+    pub epoch_time: i64,
 }
 
 impl GitRepoWatchHandler {
@@ -147,31 +147,28 @@ impl GitRepoWatchHandler {
 
             let repo = git2::Repository::open(&temp_path)?;
 
-            let snapshot =
-                self.get_remote_branch_head_refs(repo, self.branch_filter.clone())?;
+            let snapshot = self.get_remote_branch_head_refs(repo, self.branch_filter.clone())?;
+            //self.get_remote_branch_head_refs(repo, self.branch_filter.clone()).unwrap_or(panic!("Failed to get branch heads"));
 
             for (branch, commit) in snapshot.clone() {
                 match branch_heads_state.get(&branch) {
                     Some(c) => {
                         if &commit == c {
                             println!("No new commits in branch {} found", branch);
-                        } else {                                
+                        } else {
                             println!("New commit in branch {} found", branch);
                             closure();
                         }
-                    },
+                    }
                     None => {
                         println!("New branch '{}' found", branch);
                         closure();
-                    },
+                    }
                 }
-
             }
 
             branch_heads_state = snapshot;
-
         }
-
     }
 
     fn build_git2_remotecallback(&self) -> Result<git2::RemoteCallbacks<'static>> {
