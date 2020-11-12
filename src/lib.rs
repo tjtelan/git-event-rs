@@ -11,12 +11,12 @@ use std::thread::sleep;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
-pub enum GitCredentials {
+pub enum GitCredentials<'a> {
     SshKey {
-        username: &'static str,
+        username: &'a str,
         publickey: Option<&'static Path>,
         privatekey: &'static Path,
-        passphrase: Option<&'static str>,
+        passphrase: Option<&'a str>,
     },
     UserPassPlaintext {
         username: &'static str,
@@ -27,9 +27,9 @@ pub enum GitCredentials {
 type BranchHeads = HashMap<String, GitCommitMeta>;
 
 #[derive(Clone, Debug)]
-pub struct GitRepoWatchHandler {
+pub struct GitRepoWatchHandler<'a> {
     pub url: GitUrl,
-    pub credentials: Option<GitCredentials>,
+    pub credentials: Option<GitCredentials<'a>>,
     pub branch_filter: Option<Vec<String>>,
     pub use_shallow: bool,
     //branch_heads: Option<BranchHeads>,
@@ -50,7 +50,8 @@ pub struct GitCommitMeta {
     pub epoch_time: i64,
 }
 
-impl GitRepoWatchHandler {
+// trait bound AsRef<Path> for GitCredentials?
+impl<'a> GitRepoWatchHandler<'a> {
     pub fn new<U: AsRef<str>>(url: U) -> Result<Self> {
         Ok(GitRepoWatchHandler {
             url: GitUrl::parse(url.as_ref()).expect("Provided git url failed parsing"),
@@ -61,7 +62,7 @@ impl GitRepoWatchHandler {
         })
     }
 
-    pub fn with_credentials(mut self, creds: GitCredentials) -> Self {
+    pub fn with_credentials(mut self, creds: GitCredentials<'a>) -> Self {
         self.credentials = Some(creds);
         self
     }
@@ -171,7 +172,7 @@ impl GitRepoWatchHandler {
         }
     }
 
-    fn build_git2_remotecallback(&self) -> Result<git2::RemoteCallbacks<'static>> {
+    fn build_git2_remotecallback(&self) -> Result<git2::RemoteCallbacks<'a>> {
         // Configure creds based on auth type, or lack of
         let mut cb = git2::RemoteCallbacks::new();
         if let Some(cred) = self.credentials.clone() {
