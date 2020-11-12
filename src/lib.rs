@@ -19,8 +19,8 @@ pub enum GitCredentials<'a> {
         passphrase: Option<&'a str>,
     },
     UserPassPlaintext {
-        username: &'static str,
-        password: &'static str,
+        username: &'a str,
+        password: &'a str,
     },
 }
 
