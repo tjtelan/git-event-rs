@@ -20,6 +20,8 @@ git-url-parse = "^0.3"
 git2_credentials = "^0.6"
 eyre = "^0.6"
 mktemp = "^0.4"
+log = "^0.4"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
+env_logger = "^0.7"
