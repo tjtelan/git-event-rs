@@ -111,11 +111,11 @@ impl GitRepoWatchHandler {
 
         let repo_ref = match &self.use_shallow {
             true => {
-                println!("Shallow clone");
+                debug!("Shallow clone");
                 self.shallow_git_clone(&temp_path.as_path())?
             }
             false => {
-                println!("Deep clone");
+                debug!("Deep clone");
                 self.git_clone(&temp_path.as_path())?
             }
         };
@@ -178,14 +178,14 @@ impl GitRepoWatchHandler {
                 match branch_heads_state.get(&branch) {
                     Some(c) => {
                         if &commit == c {
-                            println!("No new commits in branch {} found", branch);
+                            info!("No new commits in branch {} found", branch);
                         } else {
-                            println!("New commit in branch {} found", branch);
+                            info!("New commit in branch {} found", branch);
                             closure();
                         }
                     }
                     None => {
-                        println!("New branch '{}' found", branch);
+                        info!("New branch '{}' found", branch);
                         closure();
                     }
                 }
@@ -196,9 +196,6 @@ impl GitRepoWatchHandler {
     }
 
     fn build_git2_remotecallback(&self) -> git2::RemoteCallbacks {
-        // Configure creds based on auth type, or lack of
-        //let mut cb = git2::RemoteCallbacks::new();
-
         if let Some(cred) = self.credentials.clone() {
             debug!("Before building callback: {:?}", &cred);
 
@@ -212,8 +209,8 @@ impl GitRepoWatchHandler {
                     let mut cb = git2::RemoteCallbacks::new();
                     let privkey_path = std::path::PathBuf::from(private_key);
 
-                    cb.credentials(move |_, _, _| {
-                        match (public_key.clone(), passphrase.clone()) {
+                    cb.credentials(
+                        move |_, _, _| match (public_key.clone(), passphrase.clone()) {
                             (None, None) => {
                                 Ok(Cred::ssh_key(&username, None, privkey_path.as_path(), None)
                                     .expect("Could not create credentials object for ssh key"))
@@ -247,8 +244,8 @@ impl GitRepoWatchHandler {
                                 )
                                 .expect("Could not create credentials object for ssh key"))
                             }
-                        }
-                    });
+                        },
+                    );
 
                     cb
                 }
@@ -265,14 +262,9 @@ impl GitRepoWatchHandler {
             // No credentials. Repo is public
             git2::RemoteCallbacks::new()
         }
-
-        //cb
     }
 
     fn git_clone<P: AsRef<Path>>(&self, target: P) -> Result<git2::Repository> {
-        // Configure creds
-        //let cb = self.build_git2_remotecallback();
-
         let mut cb = git2::RemoteCallbacks::new();
         &cb.credentials(move |_, _, _| {
             Ok(
@@ -348,9 +340,10 @@ impl GitRepoWatchHandler {
                         .spawn()
                         .expect("Failed to run git clone");
 
-                    let _clone_out = shell_clone_command.stdout.expect("Failed to open stdout");
-                    git2::Repository::open(target.as_ref())
-                        .expect("Failed to open shallow clone dir")
+                    let clone_out = shell_clone_command.stdout.expect("Failed to open stdout");
+                    git2::Repository::open(target.as_ref()).expect(
+                        format!("Failed to open shallow clone dir: {:?}", clone_out).as_str(),
+                    )
                 }
             }
         } else {
@@ -370,12 +363,13 @@ impl GitRepoWatchHandler {
                 .spawn()
                 .expect("Failed to run git clone");
 
-            let _clone_out = shell_clone_command
+            let clone_out = shell_clone_command
                 .wait_with_output()
                 .expect("Failed to wait for output")
                 .stdout;
 
-            git2::Repository::open(target.as_ref()).expect("Failed to open shallow clone dir")
+            git2::Repository::open(target.as_ref())
+                .expect(format!("Failed to open shallow clone dir: {:?}", clone_out).as_str())
         };
 
         Ok(repo)

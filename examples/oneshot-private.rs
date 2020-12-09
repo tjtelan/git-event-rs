@@ -5,35 +5,27 @@ use git_event::GitRepoWatchHandler;
 use git_url_parse::GitUrl;
 use std::env;
 
-use std::fs::File;
-use std::io::prelude::*;
-
-use git2::{build::RepoBuilder, Cred, FetchOptions, RemoteCallbacks};
-use std::path::Path;
+use log::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env::set_var("RUST_LOG", "oneshot_private");
+
     let _ = env_logger::try_init();
 
     // Set an env var for private git repo
     let test_url = env::var("TEST_GIT_URL").expect("This test needs env var TEST_GIT_URL set");
     let test_url = GitUrl::parse(&test_url).unwrap();
-    println!("test_url: {:?}", test_url.to_string());
+    info!("TEST_GIT_URL: {:?}", test_url);
 
     // Set an env var for the username used for cloning
     let ssh_user = env::var("TEST_SSH_USER").expect("This test needs TEST_SSH_USER set");
-    println!("ssh_user: {:?}", ssh_user);
+    info!("TEST_SSH_USER: {:?}", ssh_user);
 
     // Set an env var for location to private key
     let ssh_private_key_path =
         env::var("TEST_SSH_KEY").expect("This test needs TEST_SSH_KEY set to a file path");
-    println!("ssh_private_key_path: {:?}", ssh_private_key_path);
-
-    //let mut file = File::open(ssh_private_key_path)?;
-    //let mut ssh_private_key = String::new();
-    //file.read_to_string(&mut ssh_private_key)?;
-
-    //let ssh_key_passphrase = env::var("TEST_SSH_PASSPHRASE").unwrap_or_default();
+    info!("TEST_SSH_KEY: {:?}", ssh_private_key_path);
 
     let clone_creds = git_event::GitCredentials::SshKey {
         username: ssh_user,
@@ -41,10 +33,6 @@ async fn main() -> Result<()> {
         private_key: ssh_private_key_path,
         passphrase: None,
     };
-
-    println!("clone_creds: {:?}", clone_creds);
-
-    //println!("URI: {}", test_url.trim_auth().to_string());
 
     let watcher = GitRepoWatchHandler::new(test_url.to_string())?
         .with_credentials(clone_creds)
