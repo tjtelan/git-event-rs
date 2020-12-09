@@ -4,34 +4,57 @@ use git2::Cred;
 use git_url_parse::GitUrl;
 use mktemp::Temp;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::string::ToString;
 use std::thread::sleep;
 use std::time::Duration;
 
+use log::{debug, info};
+
 #[derive(Debug, Clone)]
 pub enum GitCredentials {
     SshKey {
-        username: &'static str,
-        publickey: Option<&'static Path>,
-        privatekey: &'static Path,
-        passphrase: Option<&'static str>,
+        username: String,
+        public_key: Option<String>,
+        private_key: String,
+        passphrase: Option<String>,
     },
     UserPassPlaintext {
-        username: &'static str,
-        password: &'static str,
+        username: String,
+        password: String,
     },
+}
+
+impl GitCredentials {
+    //pub fn ssh_key<P: AsRef<Path>>(username: String, publickey: Option<P>, privatekey: P, passphrase: Option<String>) -> Self{
+
+    //    let pk = if let Some(pk) = publickey {
+    //        Some(pk.as_ref())
+    //    } else { None };
+    //    let pp = if let Some(pp) = passphrase {
+    //        Some(pp.as_str())
+    //    } else { None };
+
+    //    GitCredentials::SshKey {
+    //        username: username.as_str(),
+    //        publickey: pk,
+    //        privatekey: privatekey.as_ref(),
+    //        passphrase: pp,
+    //    }
+    //}
 }
 
 type BranchHeads = HashMap<String, GitCommitMeta>;
 
 #[derive(Clone, Debug)]
 pub struct GitRepoWatchHandler {
-    url: GitUrl,
-    credentials: Option<GitCredentials>,
-    branch_filter: Option<Vec<String>>,
-    use_shallow: bool,
+    pub url: GitUrl,
+    pub credentials: Option<GitCredentials>,
+    pub branch_filter: Option<Vec<String>>,
+    pub use_shallow: bool,
     //branch_heads: Option<BranchHeads>,
     // TODO:
     //path_filter: Option<Vec<String>>,
@@ -39,17 +62,18 @@ pub struct GitRepoWatchHandler {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GitRepoState {
-    url: GitUrl,
-    branch_heads: BranchHeads,
+    pub url: GitUrl,
+    pub branch_heads: BranchHeads,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GitCommitMeta {
-    id: Vec<u8>,
-    message: Option<String>,
-    epoch_time: i64,
+    pub id: Vec<u8>,
+    pub message: Option<String>,
+    pub epoch_time: i64,
 }
 
+// trait bound AsRef<Path> for GitCredentials?
 impl GitRepoWatchHandler {
     pub fn new<U: AsRef<str>>(url: U) -> Result<Self> {
         Ok(GitRepoWatchHandler {
@@ -87,21 +111,21 @@ impl GitRepoWatchHandler {
 
         let repo_ref = match &self.use_shallow {
             true => {
-                println!("Shallow clone");
+                debug!("Shallow clone");
                 self.shallow_git_clone(&temp_path.as_path())?
             }
             false => {
-                println!("Deep clone");
+                debug!("Deep clone");
                 self.git_clone(&temp_path.as_path())?
             }
         };
 
-        //// DEBUG: list files from temp path
-        //let paths = std::fs::read_dir(temp_path.as_path()).unwrap();
+        // DEBUG: list files from temp path
+        let paths = std::fs::read_dir(temp_path.as_path()).unwrap();
 
-        //for path in paths {
-        //    println!("Name: {}", path.unwrap().path().display())
-        //}
+        for path in paths {
+            debug!("Name: {}", path.unwrap().path().display())
+        }
 
         // Read the repo and analyze and build report
         //
@@ -147,62 +171,107 @@ impl GitRepoWatchHandler {
 
             let repo = git2::Repository::open(&temp_path)?;
 
-            let snapshot =
-                self.get_remote_branch_head_refs(repo, self.branch_filter.clone())?;
+            let snapshot = self.get_remote_branch_head_refs(repo, self.branch_filter.clone())?;
+            //self.get_remote_branch_head_refs(repo, self.branch_filter.clone()).unwrap_or(panic!("Failed to get branch heads"));
 
             for (branch, commit) in snapshot.clone() {
                 match branch_heads_state.get(&branch) {
                     Some(c) => {
                         if &commit == c {
-                            println!("No new commits in branch {} found", branch);
-                        } else {                                
-                            println!("New commit in branch {} found", branch);
+                            info!("No new commits in branch {} found", branch);
+                        } else {
+                            info!("New commit in branch {} found", branch);
                             closure();
                         }
-                    },
+                    }
                     None => {
-                        println!("New branch '{}' found", branch);
+                        info!("New branch '{}' found", branch);
                         closure();
-                    },
+                    }
                 }
-
             }
 
             branch_heads_state = snapshot;
-
         }
-
     }
 
-    fn build_git2_remotecallback(&self) -> Result<git2::RemoteCallbacks<'static>> {
-        // Configure creds based on auth type, or lack of
-        let mut cb = git2::RemoteCallbacks::new();
+    fn build_git2_remotecallback(&self) -> git2::RemoteCallbacks {
         if let Some(cred) = self.credentials.clone() {
+            debug!("Before building callback: {:?}", &cred);
+
             match cred {
                 GitCredentials::SshKey {
                     username,
-                    publickey,
-                    privatekey,
+                    public_key,
+                    private_key,
                     passphrase,
                 } => {
-                    cb.credentials(move |_, _, _| {
-                        Cred::ssh_key(username, publickey, privatekey, passphrase)
-                    });
+                    let mut cb = git2::RemoteCallbacks::new();
+                    let privkey_path = std::path::PathBuf::from(private_key);
+
+                    cb.credentials(
+                        move |_, _, _| match (public_key.clone(), passphrase.clone()) {
+                            (None, None) => {
+                                Ok(Cred::ssh_key(&username, None, privkey_path.as_path(), None)
+                                    .expect("Could not create credentials object for ssh key"))
+                            }
+                            (None, Some(pp)) => Ok(Cred::ssh_key(
+                                &username,
+                                None,
+                                privkey_path.as_path(),
+                                Some(pp.as_ref()),
+                            )
+                            .expect("Could not create credentials object for ssh key")),
+                            (Some(pk), None) => {
+                                let pubkey_path = std::path::PathBuf::from(pk);
+
+                                Ok(Cred::ssh_key(
+                                    &username,
+                                    Some(pubkey_path.as_path()),
+                                    privkey_path.as_path(),
+                                    None,
+                                )
+                                .expect("Could not create credentials object for ssh key"))
+                            }
+                            (Some(pk), Some(pp)) => {
+                                let pubkey_path = std::path::PathBuf::from(pk);
+
+                                Ok(Cred::ssh_key(
+                                    &username,
+                                    Some(pubkey_path.as_path()),
+                                    privkey_path.as_path(),
+                                    Some(pp.as_ref()),
+                                )
+                                .expect("Could not create credentials object for ssh key"))
+                            }
+                        },
+                    );
+
+                    cb
                 }
                 GitCredentials::UserPassPlaintext { username, password } => {
-                    cb.credentials(move |_, _, _| Cred::userpass_plaintext(username, password));
+                    let mut cb = git2::RemoteCallbacks::new();
+                    cb.credentials(move |_, _, _| {
+                        Cred::userpass_plaintext(username.as_str(), password.as_str())
+                    });
+
+                    cb
                 }
             }
+        } else {
+            // No credentials. Repo is public
+            git2::RemoteCallbacks::new()
         }
-
-        Ok(cb)
     }
 
     fn git_clone<P: AsRef<Path>>(&self, target: P) -> Result<git2::Repository> {
-        // Configure creds
-        let cb = self
-            .build_git2_remotecallback()
-            .expect("Failed to build git2::RemoteCallback");
+        let mut cb = git2::RemoteCallbacks::new();
+        &cb.credentials(move |_, _, _| {
+            Ok(
+                Cred::ssh_key("git", None, Path::new("/tmp/deletemesshkey"), None)
+                    .expect("Could not create credentials object for ssh key"),
+            )
+        });
 
         let mut builder = git2::build::RepoBuilder::new();
         let mut fetch_options = git2::FetchOptions::new();
@@ -210,7 +279,7 @@ impl GitRepoWatchHandler {
         fetch_options.remote_callbacks(cb);
         builder.fetch_options(fetch_options);
 
-        let repo = match builder.clone(&self.url.trim_auth().to_string(), target.as_ref()) {
+        let repo = match builder.clone(&self.url.to_string(), target.as_ref()) {
             Ok(repo) => repo,
             Err(e) => panic!("failed to clone: {}", e),
         };
@@ -223,8 +292,8 @@ impl GitRepoWatchHandler {
             match cred {
                 GitCredentials::SshKey {
                     username,
-                    publickey: _,
-                    privatekey,
+                    public_key: _,
+                    private_key,
                     passphrase: _,
                 } => {
                     let mut parsed_uri = self.url.trim_auth();
@@ -238,15 +307,20 @@ impl GitRepoWatchHandler {
                         .arg("--depth=1")
                         .arg("--config")
                         .arg(format!(
-                            "core.sshcommand=\"ssh -i {privkey_path}\"",
-                            privkey_path = privatekey.display()
+                            "core.sshcommand=ssh -i {privkey_path}",
+                            privkey_path = private_key
                         ))
                         .stdout(Stdio::piped())
                         .stderr(Stdio::null())
                         .spawn()
                         .expect("failed to run git clone");
 
-                    let _clone_out = shell_clone_command.stdout.expect("failed to open stdout");
+                    let clone_out = shell_clone_command
+                        .wait_with_output()
+                        .expect("failed to open stdout");
+
+                    debug!("Clone output: {:?}", clone_out);
+
                     git2::Repository::open(target.as_ref())
                         .expect("Failed to open shallow clone dir")
                 }
@@ -266,16 +340,17 @@ impl GitRepoWatchHandler {
                         .spawn()
                         .expect("Failed to run git clone");
 
-                    let _clone_out = shell_clone_command.stdout.expect("Failed to open stdout");
-                    git2::Repository::open(target.as_ref())
-                        .expect("Failed to open shallow clone dir")
+                    let clone_out = shell_clone_command.stdout.expect("Failed to open stdout");
+                    git2::Repository::open(target.as_ref()).expect(
+                        format!("Failed to open shallow clone dir: {:?}", clone_out).as_str(),
+                    )
                 }
             }
         } else {
             let parsed_uri = self.url.trim_auth();
 
-            println!("Url: {}", format!("{}", parsed_uri));
-            println!("Directory: {}", format!("{}", target.as_ref().display()));
+            info!("Url: {}", format!("{}", parsed_uri));
+            info!("Directory: {}", format!("{}", target.as_ref().display()));
 
             let shell_clone_command = Command::new("git")
                 .arg("clone")
@@ -288,12 +363,13 @@ impl GitRepoWatchHandler {
                 .spawn()
                 .expect("Failed to run git clone");
 
-            let _clone_out = shell_clone_command
+            let clone_out = shell_clone_command
                 .wait_with_output()
                 .expect("Failed to wait for output")
                 .stdout;
 
-            git2::Repository::open(target.as_ref()).expect("Failed to open shallow clone dir")
+            git2::Repository::open(target.as_ref())
+                .expect(format!("Failed to open shallow clone dir: {:?}", clone_out).as_str())
         };
 
         Ok(repo)
@@ -319,7 +395,7 @@ impl GitRepoWatchHandler {
         repo: git2::Repository,
         branch_filter: Option<Vec<String>>,
     ) -> Result<HashMap<String, GitCommitMeta>> {
-        let cb = self.build_git2_remotecallback().ok();
+        let cb = self.build_git2_remotecallback();
 
         let remote = self
             .get_remote_name(&repo)
@@ -333,7 +409,7 @@ impl GitRepoWatchHandler {
         // Connect to the remote and call the printing function for each of the
         // remote references.
         let connection = remote
-            .connect_auth(git2::Direction::Fetch, cb, None)
+            .connect_auth(git2::Direction::Fetch, Some(cb), None)
             .unwrap();
 
         let git_branch_ref_prefix = "refs/heads/";

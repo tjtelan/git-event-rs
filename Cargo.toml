@@ -1,6 +1,6 @@
 [package]
 authors = ["T.J. Telan <t.telan@gmail.com>"]
-categories = ["events", "loop", "callback", "handler", "signal"]
+categories = ["asynchronous"]
 description = "Customizable event handler for updates in remote git repositories"
 documentation = "https://docs.rs/git-event"
 edition = "2018"
@@ -9,7 +9,7 @@ license = "MIT"
 name = "git-event"
 readme = "README.md"
 repository = "https://github.com/tjtelan/git-event-rs"
-version = "0.0.1"
+version = "0.1.0"
 
 [badges.maintenance]
 status = "actively-developed"
@@ -20,6 +20,8 @@ git-url-parse = "^0.3"
 git2_credentials = "^0.6"
 eyre = "^0.6"
 mktemp = "^0.4"
+log = "^0.4"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
+env_logger = "^0.7"
