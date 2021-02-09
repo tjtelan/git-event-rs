@@ -1,4 +1,4 @@
-use eyre::Result;
+use color_eyre::Result;
 
 use git_event::GitRepoWatchHandler;
 
@@ -8,7 +8,7 @@ async fn main() -> Result<()> {
 
     let watcher = GitRepoWatchHandler::new(test_url)?.with_shallow_clone(true);
 
-    let state = watcher.oneshot_report().await?;
+    let state = watcher.update_state().await?;
 
     println!("git state: {:?}", state);
 
