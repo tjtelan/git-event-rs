@@ -1,4 +1,4 @@
-use eyre::Result;
+use color_eyre::Result;
 
 use git_event::GitRepoWatchHandler;
 
@@ -10,6 +10,7 @@ async fn main() -> Result<()> {
 
     let mut watcher = GitRepoWatchHandler::new(test_url)?.with_shallow_clone(true);
 
+    // TODO: Modify example to show off referencing the git repo state. How? Is this possible?
     let _ = watcher.watch_new_commits(move || println!("Hello new commit"));
 
     Ok(())

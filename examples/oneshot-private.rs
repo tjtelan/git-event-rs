@@ -1,9 +1,11 @@
-use eyre::Result;
+use color_eyre::Result;
 
 use git_event::GitRepoWatchHandler;
 
+use git_meta;
 use git_url_parse::GitUrl;
 use std::env;
+use std::path::PathBuf;
 
 use log::info;
 
@@ -23,11 +25,12 @@ async fn main() -> Result<()> {
     info!("TEST_SSH_USER: {:?}", ssh_user);
 
     // Set an env var for location to private key
-    let ssh_private_key_path =
-        env::var("TEST_SSH_KEY").expect("This test needs TEST_SSH_KEY set to a file path");
+    let ssh_private_key_path = PathBuf::from(
+        env::var("TEST_SSH_KEY").expect("This test needs TEST_SSH_KEY set to a file path"),
+    );
     info!("TEST_SSH_KEY: {:?}", ssh_private_key_path);
 
-    let clone_creds = git_event::GitCredentials::SshKey {
+    let clone_creds = git_meta::GitCredentials::SshKey {
         username: ssh_user,
         public_key: None,
         private_key: ssh_private_key_path,
@@ -35,10 +38,10 @@ async fn main() -> Result<()> {
     };
 
     let watcher = GitRepoWatchHandler::new(test_url.to_string())?
-        .with_credentials(clone_creds)
+        .with_credentials(Some(clone_creds))
         .with_shallow_clone(true);
 
-    let state = watcher.oneshot_report().await?;
+    let state = &watcher.update_state().await?;
 
     println!("git state: {:?}", state);
 
