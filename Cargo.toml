@@ -9,7 +9,7 @@ license = "MIT"
 name = "git-event"
 readme = "README.md"
 repository = "https://github.com/tjtelan/git-event-rs"
-version = "0.2.0"
+version = "0.2.1"
 
 [badges.maintenance]
 status = "actively-developed"
