@@ -6,7 +6,7 @@ use git_event::GitRepoWatchHandler;
 async fn main() -> Result<()> {
     let test_url = "https://github.com/rust-lang/crates.io-index.git";
 
-    let watcher = GitRepoWatchHandler::new(test_url)?.with_shallow_clone(true);
+    let mut watcher = GitRepoWatchHandler::new(test_url)?.with_shallow_clone(true);
 
     let state = watcher.update_state().await?;
 

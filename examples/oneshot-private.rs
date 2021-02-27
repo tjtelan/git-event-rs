@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
         passphrase: None,
     };
 
-    let watcher = GitRepoWatchHandler::new(test_url.to_string())?
+    let mut watcher = GitRepoWatchHandler::new(test_url.to_string())?
         .with_credentials(Some(clone_creds))
         .with_shallow_clone(true);
 
