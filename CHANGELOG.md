@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/tjtelan/git-event-rs/compare/v0.2.1...v0.3.0) (2021-02-27)
+- Updating `watch_new_commits` to be `async`
+- Updating `watch_new_commits` input closure, to return `GitRepoState` to user
+- Updating `watch_new_commits` params with `pre_run` to call the closure once before polling for updates
+- Offering a sync version of `watch_new_commits` called `watch_new_commits_sync`
+- Changed `update_state` input to `&mut self`
+- `update_state` sets changed paths between commits.
 # [0.2.1](https://github.com/tjtelan/git-event-rs/compare/v0.2.0...v0.2.1) (2021-02-12)
 - Updating `git-meta` to `^0.2`
 # [0.2.0](https://github.com/tjtelan/git-event-rs/compare/v0.1.0...v0.2.0) (2021-02-08)
