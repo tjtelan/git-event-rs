@@ -14,9 +14,9 @@ async fn main() -> Result<()> {
     let mut watcher = GitRepoWatchHandler::new(test_url)?
         //.with_path(tempdir.to_path_buf())
         .with_branch(Some(branch))
-        .with_commit(Some(commit_id));
+        .with_commit(Some(commit_id))?;
 
-    println!("Watcher: {:?}", watcher.state.clone().unwrap());
+    println!("Watcher: {:?}", watcher.state().unwrap());
 
     let state = watcher.update_state().await?;
 
