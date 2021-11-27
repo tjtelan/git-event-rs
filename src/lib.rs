@@ -1,12 +1,12 @@
 //use calloop::{generic::Generic, EventLoop, Interest, Mode};
 use chrono::{DateTime, Utc};
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{eyre, Result};
 use mktemp::Temp;
 use std::thread::sleep;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 
 use git_meta::{GitCommitMeta, GitCredentials, GitRepo};
 
@@ -61,50 +61,59 @@ impl GitRepoWatchHandler {
     /// Set the current repo commit id.
     /// If you're using `with_commit()` to build a `GitRepoWatcher` with `new()
     /// then use `with_commit()` as the end of the chain
-    pub fn with_commit(mut self, id: Option<String>) -> Self {
+    pub fn with_commit(mut self, id: Option<String>) -> Result<Self> {
         // We're going to do a deep clone in order to build this...
-        let tempdir = Temp::new_dir().unwrap();
+        let tempdir = Temp::new_dir()?;
 
-        let _clone = self.repo.git_clone(tempdir.to_path_buf()).unwrap();
-        let repo =
-            GitRepo::open(tempdir.to_path_buf(), self.repo.branch.clone(), id.clone()).unwrap();
+        // Clone repo and then change to the specific branch/commit, if specified
+        let _clone = self.repo.git_clone(tempdir.to_path_buf())?;
+        let repo = GitRepo::open(tempdir.to_path_buf(), self.repo.branch.clone(), id.clone())?;
+
+        let repo_head = self
+            .repo
+            .head
+            .clone()
+            .ok_or_else(|| eyre!("Repo HEAD commit is not set"))?;
+        let repo_branch = self
+            .repo
+            .branch
+            .clone()
+            .ok_or_else(|| eyre!("Repo branch is not set"))?;
 
         //println!("opened: {:?}", repo.list_files_changed_at(id.clone().unwrap()));
 
         let mut path_alert: HashMap<String, Vec<PathBuf>> = HashMap::new();
         // Get the files changed in the HEAD commit
-        let changed_paths = repo
-            .list_files_changed_at(repo.clone().head.expect("No HEAD commit set").id)
-            .expect("Error retrieving changed paths");
+        let changed_paths = repo.list_files_changed_at(repo_head.id.clone())?;
 
         //println!("{:?}", &changed_paths);
 
+        // Save list of paths where changes were made
         if let Some(paths) = changed_paths {
-            path_alert.insert(repo.clone().branch.unwrap(), paths);
+            path_alert.insert(repo_branch.clone(), paths);
         }
 
+        // Save opened repo
         self.repo = repo;
 
-        let mut repo_report = GitRepoState::default();
-
-        // Build a `BranchHeads` with just one entry: `id`
         let mut head = HashMap::new();
         head.insert(
-            self.repo.branch.clone().unwrap(),
+            repo_branch.clone(),
             GitCommitMeta {
-                id: self.repo.head.clone().unwrap().id,
-                message: self.repo.head.clone().unwrap().message,
-                timestamp: self.repo.head.clone().unwrap().timestamp,
+                id: repo_head.id.clone(),
+                message: repo_head.message,
+                timestamp: repo_head.timestamp,
             },
         );
 
+        let mut repo_report = GitRepoState::default();
         repo_report.branch_heads = head;
         repo_report.last_updated = Some(Utc::now());
         repo_report.path_alert = path_alert;
 
         self.state = Some(repo_report);
         self.repo = self.repo.with_commit(id);
-        self
+        Ok(self)
     }
 
     pub fn with_credentials(mut self, creds: Option<GitCredentials>) -> Self {
@@ -122,6 +131,7 @@ impl GitRepoWatchHandler {
         self
     }
 
+    #[cfg(feature = "shallow_clone")]
     pub fn with_shallow_clone(mut self, shallow_choice: bool) -> Self {
         self.use_shallow = shallow_choice;
         self
@@ -138,24 +148,30 @@ impl GitRepoWatchHandler {
     //    // Re-init GitCommitMeta
     //}
 
-    pub fn state(self) -> Option<GitRepoState> {
-        self.state
+    pub fn state(&self) -> Option<GitRepoState> {
+        self.state.clone()
     }
 
     fn _update_state(&mut self) -> Result<GitRepoState> {
         let prev_state = self.clone();
 
+        // Re-clone the repo
         let temp_path = Temp::new_dir()?;
 
-        match &self.use_shallow {
-            true => {
-                debug!("Shallow clone");
-                self.repo = self.repo.git_clone_shallow(&temp_path.as_path())?;
+        self.repo = if cfg!(feature = "shallow_clone") {
+            match &self.use_shallow {
+                true => {
+                    debug!("Shallow clone");
+                    self.repo.git_clone_shallow(&temp_path.as_path())?
+                }
+                false => {
+                    debug!("Deep clone");
+                    self.repo.git_clone(&temp_path.as_path())?
+                }
             }
-            false => {
-                debug!("Deep clone");
-                self.repo = self.repo.git_clone(&temp_path.as_path())?;
-            }
+        } else {
+            debug!("Deep clone");
+            self.repo.git_clone(&temp_path.as_path())?
         };
 
         //// DEBUG: list files from temp path
@@ -230,95 +246,91 @@ impl GitRepoWatchHandler {
         self._update_state()
     }
 
-    pub async fn watch_new_commits<F>(&mut self, pre_run: bool, closure: F) -> Result<()>
-    where
-        F: Fn(GitRepoState),
-    {
+    pub async fn watch_new_commits(
+        &mut self,
+        pre_run: bool,
+        closure: impl Fn(GitRepoState),
+    ) -> Result<()> {
         let mut branch_heads_state = self.update_state().await?;
 
         if pre_run {
             closure(branch_heads_state.clone());
         }
 
+        // New commit check
         loop {
             sleep(self.poll_freq);
 
-            let snapshot = &self.state.clone().unwrap().branch_heads;
-
-            for (branch, commit) in snapshot.clone() {
-                match branch_heads_state.branch_heads.get(&branch) {
-                    Some(c) => {
-                        if &commit == c {
-                            info!("No new commits in branch {} found", branch);
-                        } else {
-                            info!("New commit in branch {} found", branch);
-                            closure(
-                                self.state
-                                    .clone()
-                                    .expect("No state found in GitRepoWatcherHandler"),
-                            );
-                        }
-                    }
-                    None => {
-                        info!("New branch '{}' found", branch);
-                        closure(
-                            self.state
-                                .clone()
-                                .expect("No state found in GitRepoWatcherHandler"),
-                        );
-                    }
-                }
-            }
-
+            let snapshot = self.get_branches_snapshot()?;
             branch_heads_state = self.update_state().await?;
+
+            // Loop over all of the branches and the last commits we saw them at
+            self.run_code_if_new_commit_in_branch(branch_heads_state, snapshot.clone(), &closure)?;
         }
     }
 
-    pub fn watch_new_commits_sync<F>(&mut self, pre_run: bool, closure: F) -> Result<()>
-    where
-        F: Fn(GitRepoState),
-    {
-        let mut branch_heads_state = self.update_state_sync()?;
+    fn run_code_if_new_commit_in_branch(
+        &self,
+        current_state: GitRepoState,
+        current_commits: HashMap<String, GitCommitMeta>,
+        closure: impl Fn(GitRepoState) + Copy,
+    ) -> Result<bool> {
+        for (branch, commit) in current_commits {
+            match current_state.branch_heads.get(&branch) {
+                Some(c) => {
+                    if &commit == c {
+                        info!("No new commits in branch {} found", branch);
+                    } else {
+                        info!("New commit in branch {} found", branch);
 
+                        if let Some(state) = self.state() {
+                            closure(state);
+                        } else {
+                            return Err(eyre!("No state found"));
+                        }
+                    }
+                }
+                None => {
+                    info!("New branch '{}' found", branch);
+                    if let Some(state) = self.state() {
+                        closure(state);
+                    } else {
+                        return Err(eyre!("No state found"));
+                    }
+                }
+            }
+        }
+        Ok(true)
+    }
+    pub fn watch_new_commits_sync(
+        &mut self,
+        pre_run: bool,
+        closure: impl Fn(GitRepoState),
+    ) -> Result<()> {
         if pre_run {
-            closure(
-                self.state
-                    .clone()
-                    .expect("No state found in GitRepoWatcherHandler"),
-            );
+            if let Some(state) = self.state() {
+                closure(state);
+            } else {
+                return Err(eyre!("No state found"));
+            }
         }
 
         loop {
             sleep(self.poll_freq);
 
-            let snapshot = &self.state.clone().unwrap().branch_heads;
+            let snapshot = self.get_branches_snapshot()?;
+            let branch_heads_state = self.update_state_sync()?;
 
-            for (branch, commit) in snapshot.clone() {
-                match branch_heads_state.branch_heads.get(&branch) {
-                    Some(c) => {
-                        if &commit == c {
-                            info!("No new commits in branch {} found", branch);
-                        } else {
-                            info!("New commit in branch {} found", branch);
-                            closure(
-                                self.state
-                                    .clone()
-                                    .expect("No state found in GitRepoWatcherHandler"),
-                            );
-                        }
-                    }
-                    None => {
-                        info!("New branch '{}' found", branch);
-                        closure(
-                            self.state
-                                .clone()
-                                .expect("No state found in GitRepoWatcherHandler"),
-                        );
-                    }
-                }
-            }
+            // Loop over all of the branches and the last commits we saw them at
+            self.run_code_if_new_commit_in_branch(branch_heads_state, snapshot.clone(), &closure)?;
+        }
+    }
 
-            branch_heads_state = self.update_state_sync()?;
+    fn get_branches_snapshot(&self) -> Result<HashMap<String, GitCommitMeta>> {
+        if let Some(state) = self.state.clone() {
+            Ok(state.branch_heads)
+        } else {
+            Err(eyre!("Unable to get snapshot of branch HEAD refs"))
         }
     }
 }

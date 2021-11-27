@@ -1,3 +1,8 @@
+# [0.4.0](https://github.com/tjtelan/git-event-rs/compare/v0.3.0...v0.4.0) (2021-11-24)
+- Migrate to Rust 2021
+- Change panic behavior to return `Err()`
+- Replace `log` crate with `tracing`
+- Add feature `shallow_clone` to allow compilation w/o needing `git` installed in PATH.
 # [0.3.0](https://github.com/tjtelan/git-event-rs/compare/v0.2.1...v0.3.0) (2021-02-27)
 - Updating `watch_new_commits` to be `async`
 - Updating `watch_new_commits` input closure, to return `GitRepoState` to user
