@@ -98,7 +98,7 @@ impl GitRepoWatchHandler {
 
         let mut head = HashMap::new();
         head.insert(
-            repo_branch.clone(),
+            repo_branch,
             GitCommitMeta {
                 id: repo_head.id.clone(),
                 message: repo_head.message,
@@ -106,10 +106,11 @@ impl GitRepoWatchHandler {
             },
         );
 
-        let mut repo_report = GitRepoState::default();
-        repo_report.branch_heads = head;
-        repo_report.last_updated = Some(Utc::now());
-        repo_report.path_alert = path_alert;
+        let repo_report = GitRepoState {
+            branch_heads: head,
+            last_updated: Some(Utc::now()),
+            path_alert,
+        };
 
         self.state = Some(repo_report);
         self.repo = self.repo.with_commit(id);
@@ -201,9 +202,8 @@ impl GitRepoWatchHandler {
         for (branch, commit) in branch_heads {
             // Try to get a previous commit
             if let Some(c) = prev_state
-                .state
-                .clone()
-                .unwrap_or(GitRepoState::default())
+                .state()
+                .unwrap_or_default()
                 .branch_heads
                 .get(&branch)
             {
