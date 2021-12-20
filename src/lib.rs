@@ -163,7 +163,9 @@ impl GitRepoWatchHandler {
             match &self.use_shallow {
                 true => {
                     debug!("Shallow clone");
-                    self.repo.to_clone().git_clone_shallow(&temp_path.as_path())?
+                    self.repo
+                        .to_clone()
+                        .git_clone_shallow(&temp_path.as_path())?
                 }
                 false => {
                     debug!("Deep clone");
