@@ -193,6 +193,8 @@ dependencies = [
 [[package]]
 name = "git-meta"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0563238cbd360079459dab38d3e8774640875923efc13dbe45f50b3068bc704f"
 dependencies = [
  "chrono",
  "color-eyre",

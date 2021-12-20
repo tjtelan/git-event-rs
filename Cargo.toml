@@ -28,5 +28,5 @@ git-meta = "^0.5"
 tokio = { version = "^1.1", features = ["full"] }
 env_logger = "^0.9"
 
-[patch.crates-io]
-git-meta = { path = "../git-meta-rs" }
+#[patch.crates-io]
+#git-meta = { path = "../git-meta-rs" }
