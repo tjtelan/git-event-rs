@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     let _ = watcher
         .watch_new_commits(true, move |state| {
             println!();
-            println!("Last updated: {:?}", state.last_updated);
+            println!("Last updated: {:#?}", state.last_updated);
 
             for (branch, meta) in state.branch_heads {
                 println!("Branch: {}", branch);

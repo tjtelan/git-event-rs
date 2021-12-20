@@ -3,26 +3,30 @@ authors = ["T.J. Telan <t.telan@gmail.com>"]
 categories = ["asynchronous"]
 description = "Customizable event handler for updates in remote git repositories"
 documentation = "https://docs.rs/git-event"
-edition = "2018"
+edition = "2021"
 keywords = ["git"]
 license = "MIT"
 name = "git-event"
 readme = "README.md"
 repository = "https://github.com/tjtelan/git-event-rs"
-version = "0.3.0"
+version = "0.4.0"
 
-[badges.maintenance]
-status = "actively-developed"
+[features]
+default = ["shallow_clone"]
+shallow_clone = []
 
 [dependencies]
 git2 = "^0.13"
-git-url-parse = "^0.3"
+git-url-parse = "^0.4"
 color-eyre = "^0.5"
 mktemp = "^0.4"
-log = "^0.4"
+tracing = "^0.1"
 chrono = "^0.4"
-git-meta = "^0.3"
+git-meta = "^0.5"
 
 [dev-dependencies]
 tokio = { version = "^1.1", features = ["full"] }
-env_logger = "^0.8"
+env_logger = "^0.9"
+
+#[patch.crates-io]
+#git-meta = { path = "../git-meta-rs" }

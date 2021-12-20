@@ -7,7 +7,7 @@ use git_url_parse::GitUrl;
 use std::env;
 use std::path::PathBuf;
 
-use log::info;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
