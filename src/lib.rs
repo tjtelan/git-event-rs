@@ -66,7 +66,7 @@ impl GitRepoWatchHandler {
         let tempdir = Temp::new_dir()?;
 
         // Clone repo and then change to the specific branch/commit, if specified
-        let _clone = self.repo.git_clone(tempdir.to_path_buf())?;
+        let _clone = self.repo.to_clone().git_clone(tempdir.to_path_buf())?;
         let repo = GitRepo::open(tempdir.to_path_buf(), self.repo.branch.clone(), id.clone())?;
 
         let repo_head = self
@@ -84,7 +84,7 @@ impl GitRepoWatchHandler {
 
         let mut path_alert: HashMap<String, Vec<PathBuf>> = HashMap::new();
         // Get the files changed in the HEAD commit
-        let changed_paths = repo.list_files_changed_at(repo_head.id.clone())?;
+        let changed_paths = repo.to_info().list_files_changed_at(repo_head.id.clone())?;
 
         //println!("{:?}", &changed_paths);
 
@@ -163,16 +163,16 @@ impl GitRepoWatchHandler {
             match &self.use_shallow {
                 true => {
                     debug!("Shallow clone");
-                    self.repo.git_clone_shallow(&temp_path.as_path())?
+                    self.repo.to_clone().git_clone_shallow(&temp_path.as_path())?
                 }
                 false => {
                     debug!("Deep clone");
-                    self.repo.git_clone(&temp_path.as_path())?
+                    self.repo.to_clone().git_clone(&temp_path.as_path())?
                 }
             }
         } else {
             debug!("Deep clone");
-            self.repo.git_clone(&temp_path.as_path())?
+            self.repo.to_clone().git_clone(&temp_path.as_path())?
         };
 
         //// DEBUG: list files from temp path
@@ -191,6 +191,7 @@ impl GitRepoWatchHandler {
         let branch_heads = self
             .repo
             .clone()
+            .to_info()
             .get_remote_branch_head_refs(self.branch_filter.clone())?;
 
         repo_report.branch_heads = branch_heads.clone();
@@ -209,6 +210,7 @@ impl GitRepoWatchHandler {
             {
                 let paths = self
                     .repo
+                    .to_info()
                     .list_files_changed_between(commit.id, c.clone().id)?;
                 if let Some(p) = paths {
                     path_alert.insert(branch, p);
@@ -219,7 +221,7 @@ impl GitRepoWatchHandler {
                 //    println!("DEBUG: No changes in branch {} found", &branch);
                 //}
             } else {
-                let paths = self.repo.list_files_changed_at(commit.id)?;
+                let paths = self.repo.to_info().list_files_changed_at(commit.id)?;
                 if let Some(p) = paths {
                     path_alert.insert(branch, p);
                 }

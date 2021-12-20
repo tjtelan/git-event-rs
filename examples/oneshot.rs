@@ -10,7 +10,7 @@ async fn main() -> Result<()> {
 
     let state = watcher.update_state().await?;
 
-    println!("git state: {:?}", state);
+    println!("git state: {:#?}", state);
 
     Ok(())
 }
