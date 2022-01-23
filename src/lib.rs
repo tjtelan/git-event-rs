@@ -113,7 +113,7 @@ impl GitRepoWatchHandler {
         };
 
         self.state = Some(repo_report);
-        self.repo = self.repo.with_commit(id);
+        self.repo = self.repo.with_commit(id)?;
         Ok(self)
     }
 
