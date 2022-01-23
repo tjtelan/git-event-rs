@@ -1,3 +1,5 @@
+# [0.4.1](https://github.com/tjtelan/git-event-rs/compare/v0.4.0...v0.4.1) (2022-01-22)
+- Minor fix - Update dependencies
 # [0.4.0](https://github.com/tjtelan/git-event-rs/compare/v0.3.0...v0.4.0) (2021-12-20)
 - Migrate to Rust 2021
 - Change panic behavior to return `Err()`
